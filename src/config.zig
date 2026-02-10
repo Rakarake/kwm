@@ -356,6 +356,12 @@ bar: struct {
 
 sloppy_focus: bool,
 
+cursor_wrap: enum {
+    none,
+    on_output_changed,
+    on_focus_changed,
+},
+
 auto_swallow: bool,
 
 default_window_decoration: kwm.WindowDecoration,

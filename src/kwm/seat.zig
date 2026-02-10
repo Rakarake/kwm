@@ -17,6 +17,7 @@ const Config = @import("config");
 const utils = @import("utils.zig");
 const types = @import("types.zig");
 const binding = @import("binding.zig");
+const Output = @import("output.zig");
 const Window = @import("window.zig");
 const Context = @import("context.zig");
 const ShellSurface = @import("shell_surface.zig");
@@ -33,6 +34,11 @@ mode_buffer: [16]u8 = undefined,
 mode: ?[]const u8 = null,
 button: types.Button = undefined,
 focus_exclusive: bool = false,
+previous_focused: union(enum) {
+    none,
+    window: *Window,
+    output: *Output,
+} = .none,
 pointer_position: struct {
     x: i32, y: i32,
 } = undefined,
@@ -145,19 +151,73 @@ pub fn manage(self: *Self) void {
         }
         self.toggle_bindings(context.mode, true);
     }
-
-    self.rwm_seat.clearFocus();
 }
 
 
 pub fn try_focus(self: *Self) void {
     log.debug("<{*}> try focus", .{ self });
 
+    if (self.focus_exclusive) return;
+
+    const config = Config.get();
     const context = Context.get();
 
-    self.rwm_seat.clearFocus();
     if (context.focused_window()) |window| {
+        defer self.previous_focused = .{ .window = window };
+
+        switch (config.cursor_wrap) {
+            .none => {},
+            .on_output_changed => blk: {
+                switch (self.previous_focused) {
+                    .none => {},
+                    .window => |w| if (w.output == window.output) break :blk,
+                    .output => |o| if (o == window.output) break :blk,
+                }
+
+                if (window.output) |output| {
+                    self.rwm_seat.pointerWarp(
+                        output.exclusive_x() + @divFloor(output.exclusive_width(), 2),
+                        output.exclusive_y() + @divFloor(output.exclusive_height(), 2),
+                    );
+                }
+            },
+            .on_focus_changed => blk: {
+                switch (self.previous_focused) {
+                    .none, .output => {},
+                    .window => |w| if (w == window) break :blk,
+                }
+
+                if (window.output) |output| {
+                    self.rwm_seat.pointerWarp(
+                        output.exclusive_x() + window.x + @divFloor(window.width, 2),
+                        output.exclusive_y() + window.y + @divFloor(window.height, 2),
+                    );
+                }
+            }
+        }
+
         self.rwm_seat.focusWindow(window.rwm_window);
+    } else {
+        if (context.current_output) |output| blk: {
+            defer self.previous_focused = .{ .output = output };
+
+            if (config.cursor_wrap != .none) {
+                switch (self.previous_focused) {
+                    .none => {},
+                    .window => |w| if (w.output == output) break :blk,
+                    .output => |o| if (o == output) break :blk,
+                }
+            }
+
+            self.rwm_seat.pointerWarp(
+                output.exclusive_x() + @divFloor(output.exclusive_width(), 2),
+                output.exclusive_y() + @divFloor(output.exclusive_height(), 2),
+            );
+        } else {
+            self.previous_focused = .none;
+        }
+
+        self.rwm_seat.clearFocus();
     }
 }
 
@@ -546,6 +606,9 @@ fn window_interaction(self: *Self, window: *Window) void {
 
     const context = Context.get();
 
+    // avoid cursor wrapping
+    self.previous_focused = .{ .window = window };
+
     context.focus(window);
 }
 
@@ -651,6 +714,9 @@ fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *
             switch (shell_surface.type) {
                 .bar => |bar| if (comptime build_options.bar_enabled) {
                     log.debug("<{*}> interaction with {*}", .{ seat, bar });
+
+                    // avoid cursor wrapping
+                    seat.previous_focused = .{ .output = bar.output };
 
                     context.set_current_output(bar.output);
 

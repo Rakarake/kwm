@@ -54,6 +54,7 @@
         },
     },
     .sloppy_focus = false,
+    .cursor_wrap = .none,
     .auto_swallow = true,
     .default_window_decoration = .ssd,
     .border = .{
