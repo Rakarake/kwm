@@ -515,20 +515,43 @@ pub fn handle_events(self: *Self) void {
                 }
             },
             .fullscreen => |data| {
-                if (self.fullscreen != .none) return;
-
                 log.debug("<{*}> managing fullscreen: {*}", .{ self, data });
 
-                self.rwm_window.informFullscreen();
-                if (data) |output| {
+                var fullscreen_output: ?*Output = null;
+
+                switch (self.fullscreen) {
+                    .none => {
+                        self.rwm_window.informFullscreen();
+                        if (data) |output| {
+                            fullscreen_output = output;
+                        } else {
+                            log.debug("<{*}> fullscreen on window", .{ self });
+
+                            self.fullscreen = .window;
+                        }
+                    },
+                    .window => {
+                        if (data) |output| {
+                            fullscreen_output = output;
+                        }
+                    },
+                    .output => |original_output| {
+                        if (data) |output| {
+                            if (output != original_output) {
+                                log.debug("<{*}> fullscreen move from {*} to {*}", .{ self, original_output, output });
+
+                                fullscreen_output = output;
+                                self.rwm_window.exitFullscreen();
+                            }
+                        }
+                    }
+                }
+
+                if (fullscreen_output) |output| {
                     log.debug("<{*}> fullscreen on {*}", .{ self, output });
 
                     self.rwm_window.fullscreen(output.rwm_output);
                     self.fullscreen = .{ .output = output };
-                } else {
-                    log.debug("<{*}> fullscreen on window", .{ self });
-
-                    self.fullscreen = .window;
                 }
             },
             .unfullscreen => {

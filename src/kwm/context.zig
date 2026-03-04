@@ -506,6 +506,12 @@ pub fn send_to_output(self: *Self, window: *Window, direction: types.Direction) 
         };
         if (new_output != output) {
             window.set_output(new_output, true);
+            switch (window.fullscreen) {
+                .output => {
+                    window.prepare_fullscreen(new_output);
+                },
+                else => {}
+            }
         }
     }
 }
@@ -602,7 +608,9 @@ pub fn toggle_fullscreen(self: *Self, in_window: bool) void {
         } else if (self.focused_window()) |window| {
             switch (window.fullscreen) {
                 .none => window.prepare_fullscreen(if (in_window) null else window.output.?),
-                else => window.prepare_unfullscreen(),
+                .window => if (in_window) window.prepare_unfullscreen()
+                    else window.prepare_fullscreen(window.output.?),
+                .output => window.prepare_unfullscreen(),
             }
         }
     }
