@@ -793,6 +793,7 @@ fn swallow(self: *Self, window: *Self) void {
     self.y = window.y;
     self.width = window.width;
     self.height = window.height;
+    self.scroller_x = window.scroller_x;
 
     self.link.remove();
     window.link.insert(&self.link);
