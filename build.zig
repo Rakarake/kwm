@@ -94,6 +94,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "wayland", .module = wayland_mod },
             .{ .name = "xkbcommon", .module = xkbcommon_mod },
+            .{ .name = "mvzr", .module = mvzr_mod },
         },
     });
 

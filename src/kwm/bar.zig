@@ -12,6 +12,7 @@ const wl = wayland.client.wl;
 const river = wayland.client.river;
 const pixman = @import("pixman");
 const fcft = @import("fcft");
+const mvzr = @import("mvzr");
 
 const types = @import("types.zig");
 const Config = @import("config");
@@ -25,6 +26,7 @@ const ShellSurface = @import("shell_surface.zig");
 const Buffer = @import("bar/buffer.zig");
 const Component = @import("bar/component.zig");
 
+const color_pattern = mvzr.compile("\\^#([0-9a-zA-Z]{8}|!)").?;
 pub var status_buffer = [1]u8 { 0 } ** 256;
 
 font: *fcft.Font,
@@ -578,36 +580,85 @@ fn render_dynamic_component(self: *Self) void {
     }
 
     self.dynamic_splits.appendBounded(@intCast(w)) catch unreachable;
-    const status_text: []const u8 = switch (config.bar.status) {
-        .text => |text| text,
-        else => mem.span(@as([*:0]const u8, @ptrCast(&status_buffer))),
-    };
-    if (status_text.len > 0) {
-        if (to_utf8(mem.trimEnd(u8, status_text, "\n "))) |utf8| {
-            defer utils.allocator.free(utf8);
+    const status_text: []const u8 = mem.trimEnd(
+        u8,
+        switch (config.bar.status) {
+            .text => |text| text,
+            else => mem.span(@as([*:0]const u8, @ptrCast(&status_buffer))),
+        },
+        "\n ",
+    );
+    if (status_text.len > 0) status_block: {
+        var texts: std.ArrayList(struct { pixman.Color, *const fcft.TextRun }) = .empty;
+        defer texts.deinit(utils.allocator);
 
-            const text = self.font.rasterizeTextRunUtf32(utf8, .default) catch |err| {
-                log.err("createU32RgbaBuffer failed: {}", .{ err });
-                return;
-            };
-            defer text.destroy();
+        var i: usize = 0;
+        var fg = normal_fg;
+        var it = color_pattern.iterator(status_text);
+        var match = it.next();
+        while (i < status_text.len) {
+            if (match == null or i < match.?.start) {
+                const end = if (match) |m| m.start else status_text.len;
+                defer i = end;
 
-            const width = text_width(text);
+                if (to_utf8(status_text[i..end])) |utf8| {
+                    defer utils.allocator.free(utf8);
 
-            x = @intCast(w -| @as(u16, @intCast(width)) -| pad);
-            bg_rect[0].x = x;
-            bg_rect[0].width = w - @as(u16, @intCast(x));
-            _ = pixman.Image.fillRectangles(.src, buffer.image, &transparent, 1, &bg_rect);
+                    texts.append(
+                        utils.allocator,
+                        .{
+                            fg,
+                            self.font.rasterizeTextRunUtf32(
+                                utf8,
+                                .default,
+                            ) catch |err| {
+                                log.err("rasterizeTextRunUtf32 failed: {}", .{ err });
+                                break :status_block;
+                            },
+                        },
+                    ) catch |err| {
+                        log.err("append failed: {}", .{ err });
+                        break :status_block;
+                    };
+                } else {
+                    log.warn("to_utf8 failed", .{});
+                    break :status_block;
+                }
+            } else if (i == match.?.start) blk: {
+                defer {
+                    i += match.?.slice.len;
+                    match = it.next();
+                }
 
-            self.dynamic_splits.items[self.dynamic_splits.items.len-1] = x;
+                if (match.?.slice.len == 3) {
+                    fg = normal_fg;
+                } else {
+                    const hex = match.?.slice[2..];
+                    fg = color(fmt.parseInt(u32, hex, 16) catch |err| {
+                        log.err("parseInt failed: {}", .{ err });
+                        break :blk;
+                    });
+                }
+            } else unreachable;
+        }
 
-            x += self.render_text(
-                buffer,
-                text,
-                &normal_fg,
-                x+@as(i16, @intCast(@divFloor(pad, 2))),
-                y,
-            ) + @as(i16, @intCast(pad));
+        var width: u32 = 0;
+        for (texts.items) |item| {
+            _, const text = item;
+            width += text_width(text);
+        }
+        x = @intCast(w -| @as(u16, @intCast(width)) -| pad);
+
+        self.dynamic_splits.items[self.dynamic_splits.items.len-1] = x;
+
+        bg_rect[0].x = x;
+        bg_rect[0].width = w - @as(u16, @intCast(x));
+        _ = pixman.Image.fillRectangles(.src, buffer.image, &transparent, 1, &bg_rect);
+
+        x += @as(i16, @intCast(@divFloor(pad, 2)));
+        for (texts.items) |item| {
+            const c, const text = item;
+            x += self.render_text(buffer, text, &c, x, y);
         }
     }
 
