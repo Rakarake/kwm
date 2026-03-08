@@ -960,6 +960,12 @@ fn rwm_window_listener(rwm_window: *river.WindowV1, event: river.WindowV1.Event,
             log.debug("<{*}> unreliable pid: {}", .{ window, data.unreliable_pid });
 
             window.pid = data.unreliable_pid;
+        },
+        .presentation_hint => |data| {
+            log.debug("<{*}> presentation_hint: {s}", .{ window, @tagName(data.hint) });
+        },
+        .identifier => |data| {
+            log.debug("<{*}> identifier: {s}", .{ window, data.identifier });
         }
     }
 }
