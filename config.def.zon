@@ -988,6 +988,7 @@
     //      is_terminal: bool, if set true, means the window could be swallowed
     //      disable_swallow: bool, if set true, the window could not swallow any other windows
     //      scroller_mfact: f32, initial mfact of the window for scroller layout
+    //      attach_mode: like `default_attach_mode`, change attach_mode for window matched
     .window_rules = .{
         .{ .app_id = .{ .str = "", .match_null = true }, .floating = true },
         .{ .app_id = .{ .str = "zenity" }, .floating = true },
