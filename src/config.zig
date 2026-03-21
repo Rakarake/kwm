@@ -25,6 +25,7 @@ const default_config: Self = @import("default_config");
 pub const lock_mode = constants.lock_mode;
 pub const default_mode = constants.default_mode;
 pub const WindowRule = rule.Window;
+pub const OutputRule = rule.Output;
 pub const InputDeviceRule = rule.InputDevice;
 pub const LibinputDeviceRule = rule.LibinputDevice;
 pub const XkbKeyboardRule = rule.XkbKeyboard;
@@ -142,6 +143,7 @@ bindings: struct {
 },
 
 window_rules: []const rule.Window,
+output_rules: []const rule.Output,
 input_device_rules: []const rule.InputDevice,
 libinput_device_rules: []const rule.LibinputDevice,
 xkb_keyboard_rules: []const rule.XkbKeyboard,

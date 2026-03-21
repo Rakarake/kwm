@@ -117,6 +117,20 @@ pub fn destroy(self: *Self) void {
 }
 
 
+pub fn apply_rules(self: *Self) void {
+    log.debug("<{*}> apply rules", .{ self });
+
+    const config = Config.get();
+
+    for (config.output_rules) |rule| {
+        if (rule.match(self.name)) {
+            self.apply_rule(&rule);
+            break;
+        }
+    }
+}
+
+
 pub inline fn exclusive_x(self: *Self) i32 {
     return self.x;
 }
@@ -183,6 +197,13 @@ pub fn master_window(self: *Self) ?*Window {
     }
 
     return null;
+}
+
+
+pub fn set_presentation(self: *Self, mode: river.OutputV1.PresentationMode) void {
+    log.debug("<{*}> set presentation mode to {s}", .{ self, @tagName(mode) });
+
+    self.rwm_output.setPresentationMode(mode);
 }
 
 
@@ -337,6 +358,16 @@ pub fn manage(self: *Self) void {
 }
 
 
+fn apply_rule(self: *Self, rule: *const Config.OutputRule) void {
+    if (rule.presentation_mode) |mode| self.set_presentation(mode);
+    if (rule.layout) |layout| self.layout = Config.meta.override(self.layout, layout);
+    if (rule.default_layout) |default_layout| {
+        self.layout_tag = .{ default_layout } ** 32;
+        self.prev_layout_tag = .{ default_layout } ** 32;
+    }
+}
+
+
 fn set_name(self: *Self, name: ?[]const u8) void {
     if (self.name) |name_| {
         utils.allocator.free(name_);
@@ -458,6 +489,8 @@ fn wl_output_listener(wl_output: *wl.Output, event: wl.Output.Event, output: *Se
         },
         .done => {
             log.debug("<{*}> done", .{ output });
+
+            output.apply_rules();
         }
     }
 }
