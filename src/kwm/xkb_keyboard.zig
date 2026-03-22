@@ -129,7 +129,7 @@ fn apply_rule(self: *Self, rule: *const Config.XkbKeyboardRule) void {
 
     var keymap_updated = false;
     if (rule.keymap) |keymap| blk: {
-        if (self.keymap != null and Config.deep_equal(Keymap, &self.keymap.?, &keymap)) break :blk;
+        if (self.keymap != null and Config.meta.deep_equal(Keymap, &self.keymap.?, &keymap)) break :blk;
 
         self.set_keymap(&keymap) catch |err| {
             log.err("<{*}> set keymap failed: {}", .{ self, err });
