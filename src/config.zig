@@ -40,12 +40,18 @@ working_directory: union(enum) {
 
 startup_cmds: []const []const []const u8,
 
-xcursor_theme: ?struct {
-    name: []const u8,
-    size: u32,
+xcursor_theme: union(enum) {
+    none,
+    theme: struct {
+        name: []const u8,
+        size: u32,
+    },
 },
 
-background: ?u32,
+background: union(enum) {
+    none,
+    color: u32,
+},
 
 bar: struct {
     show_default: bool,
@@ -71,7 +77,13 @@ bar: struct {
     },
     click: meta.enum_struct(
         kwm.BarArea,
-        meta.enum_struct(kwm.Button, ?kwm.BindingAction),
+        meta.enum_struct(
+            kwm.Button,
+            union(enum) {
+                none,
+                action: kwm.BindingAction
+            },
+        ),
     ),
 },
 
@@ -243,7 +255,7 @@ fn try_load_user_config() ?meta.make_fields_optional(Self) {
     _ = file.readAll(buffer) catch return null;
     buffer[stat.size] = 0;
 
-    @setEvalBranchQuota(15000);
+    @setEvalBranchQuota(20000);
     return zon.parse.fromSlice(
         meta.make_fields_optional(Self),
         allocator,

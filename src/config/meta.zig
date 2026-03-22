@@ -21,6 +21,11 @@ pub fn enum_struct(comptime E: type, comptime T: type) type {
                     const default_value: T = null;
                     break :blk &default_value;
                 },
+                .@"union" => blk: {
+                    if (!@hasField(T, "none")) break :blk null;
+                    const default_value: T = .none;
+                    break :blk &default_value;
+                },
                 else => null,
             },
             .alignment = @alignOf(T),
