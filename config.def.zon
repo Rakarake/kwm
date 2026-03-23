@@ -992,6 +992,17 @@
         .{ .app_id = .{ .str = "foot" }, .is_terminal = true, .scroller_mfact = 0.8 },
     },
 
+    // output rules
+    // full scheme:
+    //      name: rule pattern
+    //
+    //      presentation_mode: presentation mode, .vsync or .async
+    //      layout: same as `layout` before but you only need to specify the values you want to change
+    //      default_layout: same as `default_layout` before
+    .output_rules = .{
+        //
+    },
+
     // input device rules
     // full scheme:
     //      name: rule pattern
