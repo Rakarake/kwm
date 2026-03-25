@@ -54,9 +54,14 @@ previous_focused: union(enum) {
     output: *Output,
 } = .none,
 pointer_position: struct {
-    x: i32, y: i32,
-} = undefined,
-window_below_pointer: ?*Window = null,
+    x: i32 = 0,
+    y: i32 = 0,
+    new: bool = false,
+} = .{},
+window_below_pointer: struct {
+    window: ?*Window = null,
+    new: bool = false,
+} = .{},
 unhandled_actions: std.ArrayList(binding.Action) = undefined,
 xkb_bindings: std.StringHashMap(std.ArrayList(*binding.XkbBinding)) = undefined,
 pointer_bindings: std.StringHashMap(std.ArrayList(*binding.PointerBinding)) = undefined,
@@ -156,9 +161,25 @@ pub inline fn op_end(self: *Self) void {
 pub fn manage(self: *Self) void {
     defer log.debug("<{*}> managed", .{ self });
 
-    self.handle_actions();
+    defer self.pointer_position.new = false;
 
+    const config = Config.get();
     const context = Context.get();
+
+    // TODO: https://codeberg.org/river/river/issues/1317
+    // if config.sloppy_focus is true, once pointer activity, check window_below_pointer.new,
+    // if true, focus the window below pointer and reset window_below_pointer.new to false
+    if (config.sloppy_focus and self.window_below_pointer.new and self.pointer_position.new) {
+        defer self.window_below_pointer.new = false;
+
+        const window = self.window_below_pointer.window.?;
+        // avoid cursor wrapping
+        self.previous_focused = .{ .window = window };
+
+        context.focus(window);
+    }
+
+    self.handle_actions();
 
     if (self.chorded.state != .enabled) {
         if (self.chorded.state == .exiting) {
@@ -480,13 +501,13 @@ fn handle_actions(self: *Self) void {
                 }
             },
             .pointer_move => {
-                if (self.window_below_pointer) |window| {
+                if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
                     window.prepare_move(self);
                 }
             },
             .pointer_resize => {
-                if (self.window_below_pointer) |window| {
+                if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
                     window.prepare_resize(self);
                 }
@@ -742,7 +763,6 @@ fn window_interaction(self: *Self, window: *Window) void {
 fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *Self) void {
     std.debug.assert(rwm_seat == seat.rwm_seat);
 
-    const config = Config.get();
     const context = Context.get();
 
     switch (event) {
@@ -800,29 +820,29 @@ fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *
                 @alignCast(river.WindowV1.getUserData(rwm_window))
             );
 
-            std.debug.assert(seat.window_below_pointer == null);
+            std.debug.assert(seat.window_below_pointer.window == null);
 
-            seat.window_below_pointer = window;
-
-            if (config.sloppy_focus) {
-                // avoid cursor wrapping
-                seat.previous_focused = .{ .window = window };
-
-                context.focus(window);
-            }
+            seat.window_below_pointer = .{
+                .window = window,
+                .new = true,
+            };
         },
         .pointer_leave => {
             log.debug("<{*}> pointer leave", .{ seat });
 
-            std.debug.assert(seat.window_below_pointer != null);
+            std.debug.assert(seat.window_below_pointer.window != null);
 
-            seat.window_below_pointer = null;
+            seat.window_below_pointer = .{};
         },
         .pointer_position => |data| {
             log.debug("<{*}> pointer position: (x: {}, y: {})", .{ seat, data.x, data.y });
 
-            seat.pointer_position.x = data.x;
-            seat.pointer_position.y = data.y;
+            const new = seat.pointer_position.x != data.x or seat.pointer_position.y != data.y;
+            seat.pointer_position = .{
+                .x = data.x,
+                .y = data.y,
+                .new = new,
+            };
         },
         .removed => {
             log.debug("<{*}> removed", .{ seat });
