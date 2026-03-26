@@ -461,13 +461,14 @@ pub fn quit(self: *Self, exit_session: bool) void {
 pub fn focus(self: *Self, window: *Window, lift: bool) void {
     log.debug("<{*}> focus window: {*}", .{ self, window });
 
+    self.set_current_output(window.output);
     if (lift) self.window_to_lift = window;
     if (self.focus_stack.first() == window) return;
 
-    if (window.output) |output| {
-        self.set_current_output(output);
-
-        if (comptime build_options.bar_enabled) output.bar.damage(.tags);
+    if (comptime build_options.bar_enabled) {
+        if (window.output) |output| {
+            output.bar.damage(.tags);
+        }
     }
 
     window.flink.remove();
