@@ -246,7 +246,7 @@ pub fn build(b: *std.Build) void {
     const install_kwim = b.option(bool, "install_kwim", "if to install kwim") orelse true;
     kwm_options.addOption(bool, "install_kwim", install_kwim);
     if (install_kwim) {
-        const kwim = b.dependency("kwim", .{}).artifact("kwim");
+        const kwim = b.dependency("kwim", .{ .optimize = .ReleaseSafe }).artifact("kwim");
         b.installArtifact(kwim);
     }
 
