@@ -432,6 +432,8 @@ pub fn focus_iter(self: *Self, direction: types.Direction, skip: types.WindowIte
     log.debug("focus iter: {s}", .{ @tagName(direction) });
 
     if (self.focused_window()) |window| {
+        if (window.fullscreen == .output) return;
+
         var win = window;
         while (true) {
             const new_window = switch (direction) {
