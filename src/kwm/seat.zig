@@ -176,7 +176,13 @@ pub fn manage(self: *Self) void {
         // avoid cursor wrapping
         self.previous_focused = .{ .window = window };
 
-        context.focus(window, false);
+        context.focus(
+            window,
+            !window.floating
+            and if (window.output) |output|
+                output.current_layout() != .float
+                else false,
+        );
     }
 
     self.handle_actions();
