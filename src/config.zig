@@ -15,6 +15,7 @@ const rule = @import("config/rule.zig");
 const constants = @import("config/constants.zig");
 const preprocess = @import("config/preprocess.zig");
 pub const meta = @import("config/meta.zig");
+const Bar = @import("config/bar.zig");
 
 var allocator: mem.Allocator = undefined;
 
@@ -45,36 +46,7 @@ xcursor_theme: ?struct {
 
 background: ?u32,
 
-bar: struct {
-    show_default: bool,
-    position: enum {
-        top,
-        bottom,
-    },
-    font: []const u8,
-    color: struct {
-        normal: struct {
-            fg: u32,
-            bg: u32,
-        },
-        select: struct {
-            fg: u32,
-            bg: u32,
-        },
-    },
-    status: union(enum) {
-        text: []const u8,
-        stdin,
-        fifo: []const u8,
-    },
-    click: meta.enum_struct(
-        kwm.BarArea,
-        meta.enum_struct(
-            kwm.Button,
-            ?kwm.BindingAction
-        ),
-    ),
-},
+bar: Bar,
 
 sloppy_focus: bool,
 
@@ -103,25 +75,14 @@ border: struct {
     }
 },
 
-tags: []const []const u8,
-
 default_layout: kwm.Layout.Type,
 layout: kwm.Layout,
-layout_tag: struct {
-    tile: meta.enum_struct(kwm.Layout.Tile.MasterLocation, []const u8),
-    grid: meta.enum_struct(kwm.Layout.Grid.Direction, []const u8),
-    monocle: []const u8,
-    deck: meta.enum_struct(kwm.Layout.Deck.MasterLocation, []const u8),
-    scroller: []const u8,
-    float: []const u8,
-},
 
 bindings: struct {
     repeat_info: struct {
         rate: i32,
         delay: i32,
     },
-    mode_tag: []const struct { []const u8, []const u8 },
     key: []const struct {
         mode: ?[]const u8 = null,
         keysym: []const u8,
@@ -222,13 +183,4 @@ fn try_load_user_config() ?Config {
 
 pub inline fn get() *Self {
     return @ptrCast(&config);
-}
-
-
-pub fn get_mode_tag(self: *const Self, mode: []const u8) ?[]const u8 {
-    for (self.bindings.mode_tag) |pair| {
-        const m, const t = pair;
-        if (mem.eql(u8, m, mode)) return t;
-    }
-    return null;
 }
