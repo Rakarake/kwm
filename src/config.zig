@@ -18,9 +18,8 @@ pub const meta = @import("config/meta.zig");
 
 var allocator: mem.Allocator = undefined;
 
-var config: ?Self = null;
-var user_config: ?meta.make_fields_optional(Self) = null;
-const default_config: Self = @import("default_config");
+const Config = meta.add_default(Self, @as(Self, @import("default_config")));
+var config: Config = undefined;
 
 pub var path: []const u8 = undefined;
 pub const lock_mode = constants.lock_mode;
@@ -156,19 +155,14 @@ pub fn init(al: *const mem.Allocator, config_path: []const u8) void {
     allocator = al.*;
     path = config_path;
 
-    user_config = try_load_user_config();
-    refresh_config();
+    config = try_load_user_config() orelse .{};
 }
 
 
 pub inline fn deinit() void {
     log.debug("config deinit", .{});
 
-    if (user_config) |cfg| {
-        log.debug("free user config", .{});
-
-        zon.parse.free(allocator, cfg);
-    }
+    meta.zon_free(allocator, config, null);
 }
 
 
@@ -176,38 +170,22 @@ pub fn reload() meta.field_mask(Self) {
     log.debug("reload user config", .{});
 
     var mask: meta.field_mask(Self) = .{};
-    var new_cfg = try_load_user_config();
-    if (new_cfg) |*cfg| {
-        defer zon.parse.free(allocator, cfg.*);
+    var new_config = try_load_user_config();
+    if (new_config) |*new_cfg| {
+        defer meta.zon_free(allocator, new_cfg.*, null);
         const struct_info = @typeInfo(Self).@"struct";
-        if (user_config) |*old_cfg| {
-            inline for (struct_info.fields) |field| {
-                if (!meta.deep_equal(
-                    @FieldType(@TypeOf(cfg.*), field.name),
-                    &@field(old_cfg.*, field.name),
-                    &@field(cfg.*, field.name),
-                )) {
-                    @field(mask, field.name) = true;
-                    mem.swap(
-                        @FieldType(@TypeOf(cfg.*), field.name),
-                        &@field(old_cfg.*, field.name),
-                        &@field(cfg.*, field.name),
-                    );
-                }
-            }
-        } else {
-            inline for (struct_info.fields) |field| {
+        inline for (struct_info.fields) |field| {
+            if (!meta.deep_equal(
+                @FieldType(@TypeOf(new_cfg.*), field.name),
+                &@field(config, field.name),
+                &@field(new_cfg.*, field.name),
+            )) {
                 @field(mask, field.name) = true;
-            }
-        }
-
-        // if modified, refresh config
-        blk: {
-            inline for (struct_info.fields) |field| {
-                if (@field(mask, field.name)) {
-                    refresh_config();
-                    break :blk;
-                }
+                mem.swap(
+                    @FieldType(@TypeOf(new_cfg.*), field.name),
+                    &@field(config, field.name),
+                    &@field(new_cfg.*, field.name),
+                );
             }
         }
     }
@@ -215,7 +193,7 @@ pub fn reload() meta.field_mask(Self) {
 }
 
 
-fn try_load_user_config() ?meta.make_fields_optional(Self) {
+fn try_load_user_config() ?Config {
     log.info("try load user config from `{s}`", .{ path });
 
     const file = fs.cwd().openFile(path, .{ .mode = .read_only }) catch |err| {
@@ -239,7 +217,7 @@ fn try_load_user_config() ?meta.make_fields_optional(Self) {
 
     @setEvalBranchQuota(20000);
     return zon.parse.fromSlice(
-        meta.make_fields_optional(Self),
+        Config,
         allocator,
         buffer.items[0..buffer.items.len-1:0],
         null,
@@ -251,21 +229,8 @@ fn try_load_user_config() ?meta.make_fields_optional(Self) {
 }
 
 
-fn refresh_config() void {
-    log.debug("refresh config", .{});
-
-    if (user_config) |cfg| {
-        config = meta.override(default_config, cfg);
-        log.debug("config: {any}", .{ config.? });
-    }
-}
-
-
 pub inline fn get() *Self {
-    if (config == null) {
-        config = default_config;
-    }
-    return &config.?;
+    return @ptrCast(&config);
 }
 
 
