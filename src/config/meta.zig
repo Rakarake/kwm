@@ -44,11 +44,6 @@ pub fn enum_struct(comptime E: type, comptime T: type) type {
                     const default_value: T = null;
                     break :blk &default_value;
                 },
-                .@"union" => blk: {
-                    if (!@hasField(T, "none")) break :blk null;
-                    const default_value: T = .none;
-                    break :blk &default_value;
-                },
                 else => null,
             },
             .alignment = @alignOf(T),
@@ -292,10 +287,11 @@ pub fn zon_free(gpa: mem.Allocator, value: anytype, default: ?*const @TypeOf(val
             zon_free(
                 gpa,
                 @field(value, field.name),
-                if (field.default_value_ptr) |ptr| @ptrCast(@alignCast(ptr))
-                else (
-                    if (default) |ptr| &@field(ptr.*, field.name) else null
-                )
+                if (default) |ptr|
+                    @ptrCast(@alignCast(&@field(ptr.*, field.name)))
+                else
+                    if (field.default_value_ptr) |ptr| @ptrCast(@alignCast(ptr))
+                    else null
             );
         },
         .@"union" => |@"union"| if (@"union".tag_type == null) {

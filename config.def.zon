@@ -12,14 +12,15 @@
         // .{ "swaybg", "-i", "/path/to/wallpaper" },
     },
 
-    // .none
+    // null
     // or
-    // .theme = .{ .name = []const u8, .size = u32 }
-    .xcursor_theme = .none,
+    // .{ .name = []const u8, .size = u32 }
+    .xcursor_theme = null,
 
+    // ?u32
     // solid color background
-    // note: set this to .none if you use other wallpaper program like `swaybg`, orelse it will be covered by this and unable to see
-    .background = .{ .color = 0x33000000 },
+    // note: set this to null if you use other wallpaper program like `swaybg`, orelse it will be covered by this and unable to see
+    .background = 0x33000000,
 
     .bar = .{
         .show_default = true,
@@ -44,21 +45,21 @@
         .click = .{
             .tags = .{
                 // could use 0 there because it will be replace with the tag clicked
-                .left = .{ .action = .{ .set_output_tag = .{ .tag = .{ .tag = 0 } } } },
-                .right = .{ .action = .{ .toggle_output_tag = .{ .mask = 0 } } },
-                .middle = .{ .action = .{ .toggle_window_tag = .{ .mask = 0 } } },
+                .left = .{ .set_output_tag = .{ .tag = .{ .tag = 0 } } },
+                .right = .{ .toggle_output_tag = .{ .mask = 0 } },
+                .middle = .{ .toggle_window_tag = .{ .mask = 0 } },
             },
             .layout = .{
-                .left = .{ .action = .switch_to_previous_layout },
+                .left = .switch_to_previous_layout,
             },
             .mode = .{
-                .left = .{ .action = .{ .switch_mode = .{ .mode = "default" } } },
+                .left = .{ .switch_mode = .{ .mode = "default" } },
             },
             .title = .{
-                .left = .{ .action = .{ .zoom = .{ .swap = false } } },
+                .left = .{ .zoom = .{ .swap = false } },
             },
             .status = .{
-                .middle = .{ .action = .{ .spawn = .{ .argv = .{ "foot" } } } },
+                .middle = .{ .spawn = .{ .argv = .{ "foot" } } },
             },
         },
     },

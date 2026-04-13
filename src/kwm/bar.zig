@@ -141,10 +141,7 @@ pub fn handle_click(self: *Self, seat: *Seat) void {
         for (0.., self.static_splits.items) |i, split| {
             if (x <= split) {
                 const tag = @as(u32, @intCast(1)) << @as(u5, @intCast(i));
-                const callback_action = switch (config.bar.click.getter.get(.tags).getter.get(seat.button)) {
-                    .none => return,
-                    .action => |a| a,
-                };
+                const callback_action = config.bar.click.getter.get(.tags).getter.get(seat.button) orelse return;
                 action = switch (callback_action) {
                     .set_window_tag => .{ .set_window_tag = .{ .tag = .{ .tag = tag } } },
                     .toggle_window_tag => .{ .toggle_window_tag = .{ .mask = tag } },
@@ -161,18 +158,12 @@ pub fn handle_click(self: *Self, seat: *Seat) void {
     x -= self.static_component_width();
     for (&[_]types.BarArea { .mode, .layout, .title }, self.dynamic_splits.items) |area, split| {
         if (x <= split) {
-            action = switch (config.bar.click.getter.get(area).getter.get(seat.button)) {
-                .none => return,
-                .action => |a| a,
-            };
+            action = config.bar.click.getter.get(area).getter.get(seat.button) orelse return;
             return;
         }
     }
 
-    action = switch (config.bar.click.getter.get(.status).getter.get(seat.button)) {
-        .none => return,
-        .action => |a| a,
-    };
+    action = config.bar.click.getter.get(.status).getter.get(seat.button) orelse return;
 }
 
 

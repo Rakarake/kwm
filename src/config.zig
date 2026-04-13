@@ -38,18 +38,12 @@ working_directory: union(enum) {
 
 startup_cmds: []const []const []const u8,
 
-xcursor_theme: union(enum) {
-    none,
-    theme: struct {
-        name: []const u8,
-        size: u32,
-    },
+xcursor_theme: ?struct {
+    name: []const u8,
+    size: u32,
 },
 
-background: union(enum) {
-    none,
-    color: u32,
-},
+background: ?u32,
 
 bar: struct {
     show_default: bool,
@@ -77,10 +71,7 @@ bar: struct {
         kwm.BarArea,
         meta.enum_struct(
             kwm.Button,
-            union(enum) {
-                none,
-                action: kwm.BindingAction
-            },
+            ?kwm.BindingAction
         ),
     ),
 },
