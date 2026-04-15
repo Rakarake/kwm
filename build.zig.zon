@@ -55,8 +55,8 @@
             .lazy = true,
         },
         .kwim = .{
-            .url = "https://github.com/kewuaa/kwim/archive/refs/tags/v0.1.3.tar.gz",
-            .hash = "kwim-0.1.3-Ewp5G5LSAgBj9DS0jw7eO3daP0tWOKk_4VOKXmkepYPW",
+            .url = "https://github.com/kewuaa/kwim/archive/refs/tags/v0.1.4.tar.gz",
+            .hash = "kwim-0.1.4-Ewp5Gx_UAgD84P2X7z3_sv96iQjX21bxMenSp4wv8GRZ",
             .lazy = true,
         },
     },
