@@ -272,15 +272,13 @@ pub fn reload_config(self: *Self) void {
     if (comptime build_options.bar_enabled) {
         if (mask.bar) {
             self.stop_listening_status();
-        }
 
-        if (mask.bar or mask.tags or mask.layout_tag) {
             var it = self.outputs.safeIterator(.forward);
             while (it.next()) |output| {
                 if (mask.bar) {
                     output.bar.reload_font();
                 }
-                output.bar.damage(if (mask.bar or mask.tags) .all else .layout);
+                output.bar.damage(.all);
             }
         }
     }
@@ -292,37 +290,41 @@ pub fn start_listening_status(self: *Self) void {
 
     const config = Config.get();
 
-    self.bar_status_fd = switch (config.bar.status) {
-        .text => null,
-        .stdin => blk: {
-            var flags = posix.fcntl(posix.STDIN_FILENO, posix.F.GETFL, 0) catch |err| {
-                log.err("get fd flags failed: {}", .{ err });
-                break :blk null;
-            };
-            flags |= 1 << @bitOffsetOf(posix.O, "NONBLOCK");
+    self.bar_status_fd = if (config.bar.status) |area|
+        switch (area.data) {
+            .text => null,
+            .stdin => blk: {
+                var flags = posix.fcntl(posix.STDIN_FILENO, posix.F.GETFL, 0) catch |err| {
+                    log.err("get fd flags failed: {}", .{ err });
+                    break :blk null;
+                };
+                flags |= 1 << @bitOffsetOf(posix.O, "NONBLOCK");
 
-            _ = posix.fcntl(posix.STDIN_FILENO, posix.F.SETFL, flags) catch |err| {
-                log.err("set stdin fd NONBLOCK failed: {}", .{ err });
-                break :blk null;
-            };
+                _ = posix.fcntl(posix.STDIN_FILENO, posix.F.SETFL, flags) catch |err| {
+                    log.err("set stdin fd NONBLOCK failed: {}", .{ err });
+                    break :blk null;
+                };
 
-            break :blk posix.STDIN_FILENO;
-        },
-        .fifo => |fifo| try_open_fifo(fifo, &self.env) catch null,
-    };
+                break :blk posix.STDIN_FILENO;
+            },
+            .fifo => |fifo| try_open_fifo(fifo, &self.env) catch null,
+        }
+        else null;
 }
 
 
 pub fn stop_listening_status(self: *Self) void {
     const config = Config.get();
 
-    switch (config.bar.status) {
-        .text => {},
-        .stdin => self.bar_status_fd = null,
-        .fifo => if (self.bar_status_fd) |fd| {
-            log.debug("close fd {}", .{ fd });
-            posix.close(fd);
-            self.bar_status_fd = null;
+    if (config.bar.status) |area| {
+        switch (area.data) {
+            .text => {},
+            .stdin => self.bar_status_fd = null,
+            .fifo => if (self.bar_status_fd) |fd| {
+                log.debug("close fd {}", .{ fd });
+                posix.close(fd);
+                self.bar_status_fd = null;
+            }
         }
     }
 }
