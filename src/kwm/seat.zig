@@ -519,12 +519,14 @@ fn handle_actions(self: *Self) void {
             .pointer_move => {
                 if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
+                    window.ensure_floating();
                     window.prepare_move(self);
                 }
             },
             .pointer_resize => {
                 if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
+                    window.ensure_floating();
                     window.prepare_resize(self);
                 }
             },
