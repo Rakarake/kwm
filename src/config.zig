@@ -40,7 +40,7 @@ working_directory: union(enum) {
 startup_cmds: []const []const []const u8,
 
 xcursor_theme: ?struct {
-    name: []const u8,
+    name: [:0]const u8,
     size: u32,
 },
 
