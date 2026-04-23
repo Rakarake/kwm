@@ -245,6 +245,7 @@ pub fn build(b: *std.Build) void {
 
     b.installFile("doc/kwm.1", "share/man/man1/kwm.1",);
     b.installFile("config.def.zon", "share/doc/kwm/config.zon",);
+    b.installFile("contrib/kwm.desktop", "share/wayland-sessions/kwm.desktop",);
 
 
     // This creates a top level step. Top level steps have a name and can be
