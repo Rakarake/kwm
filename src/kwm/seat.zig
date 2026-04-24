@@ -448,10 +448,19 @@ fn warp_cursor(self: *Self, dest: union(enum) { window: *Window, output: *Output
             if (window.output) |output| {
                 const x = window.x + @divFloor(window.width, 2);
                 const y = window.y + @divFloor(window.height, 2);
-                break :blk .{
-                    output.exclusive_x() + @max(0, @min(output.exclusive_width(), x)),
-                    output.exclusive_y() + @max(0, @min(output.exclusive_height(), y)),
-                };
+                const abs_x = output.exclusive_x() + @max(0, @min(output.exclusive_width(), x));
+                const abs_y = output.exclusive_y() + @max(0, @min(output.exclusive_height(), y));
+                const pointer_x = self.pointer_position.x;
+                const pointer_y = self.pointer_position.y;
+                // if pointer already within the window, skip
+                if (
+                    @abs(pointer_x - abs_x) < @divFloor(window.width, 2)
+                    and
+                    @abs(pointer_y - abs_y) < @divFloor(window.height, 2)
+                ) {
+                    return;
+                }
+                break :blk .{ abs_x, abs_y };
             } else return;
         },
         .output => |output| .{
