@@ -63,6 +63,7 @@ window_below_pointer: struct {
     window: ?*Window = null,
     new: bool = false,
 } = .{},
+has_pointer_interaction: bool = false,
 unhandled_actions: std.ArrayList(binding.Action) = undefined,
 xkb_bindings: std.StringHashMap(std.ArrayList(*binding.XkbBinding)) = undefined,
 pointer_bindings: std.StringHashMap(std.ArrayList(*binding.PointerBinding)) = undefined,
@@ -227,6 +228,8 @@ pub fn try_focus(self: *Self) void {
 
     if (self.focus_exclusive) return;
 
+    defer self.has_pointer_interaction = false;
+
     const config = Config.get();
     const context = Context.get();
 
@@ -235,7 +238,7 @@ pub fn try_focus(self: *Self) void {
 
         defer self.previous_focused = .{ .window = window };
 
-        switch (config.cursor_warp) {
+        if (!self.has_pointer_interaction) switch (config.cursor_warp) {
             .none => {},
             .on_output_changed => blk: {
                 switch (self.previous_focused) {
@@ -256,7 +259,7 @@ pub fn try_focus(self: *Self) void {
 
                 self.warp_cursor(.{ .window = window });
             }
-        }
+        };
 
         // if there are any window fullscreen on output, focus it first
         self.rwm_seat.focusWindow((
@@ -270,7 +273,7 @@ pub fn try_focus(self: *Self) void {
         if (context.current_output) |output| {
             defer self.previous_focused = .{ .output = output };
 
-            if (config.cursor_warp != .none) blk: {
+            if (!self.has_pointer_interaction and config.cursor_warp != .none) blk: {
                 switch (self.previous_focused) {
                     .none => {},
                     .window => |w| if (w.output == output) break :blk,
@@ -805,10 +808,8 @@ fn window_interaction(self: *Self, window: *Window) void {
 
     const context = Context.get();
 
-    // avoid cursor warpping
-    self.previous_focused = .{ .window = window };
-
     context.focus(window, true);
+    self.has_pointer_interaction = true;
 }
 
 
@@ -832,6 +833,8 @@ fn shell_surface_interaction(self: *Self, shell_surface: *ShellSurface) void {
             context.set_current_output(background.output);
         } else unreachable,
     }
+
+    self.has_pointer_interaction = true;
 }
 
 
