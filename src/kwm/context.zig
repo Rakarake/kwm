@@ -66,6 +66,10 @@ mode: []const u8,
 running: bool = true,
 env: process.EnvMap = undefined,
 startup_processes: std.ArrayList(?process.Child) = .empty,
+quit_hook: ?struct {
+    pid: i32,
+    exit_session: bool,
+} = null,
 
 
 pub fn init(
@@ -389,10 +393,27 @@ pub fn handle_signal(self: *Self, sig: i32) void {
                 };
                 if (res.pid <= 0) break;
                 log.debug("wait pid {}", .{ res.pid });
+
+                if (self.quit_hook) |hook| if (res.pid == hook.pid) {
+                    self.quit_hook = null;
+                    if (res.status == 0) {
+                        self.quit(hook.exit_session);
+                    }
+                };
             }
         },
         else => {}
     }
+}
+
+
+pub fn register_quit_hook(self: *Self, argv: []const []const u8, exit_session: bool) void {
+    log.debug("register quit hook", .{});
+
+    if (self.quit_hook == null) {
+        const child = self.spawn_child(argv) orelse return;
+        self.quit_hook = .{ .pid = child.id, .exit_session = exit_session };
+    } else log.warn("repeatly register quit hook", .{});
 }
 
 
