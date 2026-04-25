@@ -475,7 +475,8 @@ fn handle_actions(self: *Self) void {
 
         switch (action) {
             .quit => |data| {
-                context.quit(data.exit_session);
+                if (data.hook) |argv| context.register_quit_hook(argv, data.exit_session)
+                else context.quit(data.exit_session);
             },
             .close => {
                 if (context.focused_window()) |window| {
