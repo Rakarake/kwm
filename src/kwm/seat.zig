@@ -175,8 +175,6 @@ pub fn manage(self: *Self) void {
         defer self.window_below_pointer.new = false;
 
         const window = self.window_below_pointer.window.?;
-        // avoid cursor warpping
-        self.previous_focused = .{ .window = window };
 
         context.focus(
             window,
