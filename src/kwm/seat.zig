@@ -517,14 +517,14 @@ fn handle_actions(self: *Self) void {
                 if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
                     window.ensure_floating();
-                    window.prepare_move(self);
+                    window.prepare_move(.{ .start = .{ .seat = self } });
                 }
             },
             .pointer_resize => {
                 if (self.window_below_pointer.window) |window| {
                     self.window_interaction(window);
                     window.ensure_floating();
-                    window.prepare_resize(self);
+                    window.prepare_resize(.{ .start = .{ .seat = self } });
                 }
             },
             .snap => |data| {
@@ -842,12 +842,12 @@ fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *
                     .none => {},
                     .move => |data| {
                         if (data.seat == seat) {
-                            window.prepare_move(null);
+                            window.prepare_move(.stop);
                         }
                     },
                     .resize => |data| {
                         if (data.seat == seat) {
-                            window.prepare_resize(null);
+                            window.prepare_resize(.stop);
                         }
                     }
                 }

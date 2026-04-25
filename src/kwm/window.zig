@@ -30,13 +30,29 @@ pub const Edge = enum {
     right,
 };
 
+const MoveState = union(enum) {
+    const Data = struct {
+        seat: *Seat,
+    };
+
+    start: Data,
+    stop,
+};
+const ResizeState = union(enum) {
+    const Data = struct {
+        seat: *Seat,
+    };
+
+    start: Data,
+    stop,
+};
 const Event = union(enum) {
     init,
     fullscreen: ?*Output,
     unfullscreen,
     maximize: bool,
-    move: ?*Seat,
-    resize: ?*Seat,
+    move: MoveState,
+    resize: ResizeState,
 };
 
 
@@ -365,17 +381,23 @@ pub inline fn prepare_close(self: *Self) void {
 }
 
 
-pub fn prepare_move(self: *Self, seat: ?*Seat) void {
-    log.debug("<{*}> prepare to move, seat: {*}", .{ self, seat });
+pub fn prepare_move(self: *Self, state: MoveState) void {
+    switch (state) {
+        .start => |data| log.debug("<{*}> prepare to start moving, seat: {*}", .{ self, data.seat }),
+        .stop => log.debug("<{*}> prepare to stop moving", .{ self }),
+    }
 
-    self.append_event(.{ .move = seat });
+    self.append_event(.{ .move = state });
 }
 
 
-pub fn prepare_resize(self: *Self, seat: ?*Seat) void {
-    log.debug("<{*}> prepare to resize, seat: {*}", .{ self, seat });
+pub fn prepare_resize(self: *Self, state: ResizeState) void {
+    switch (state) {
+        .start => |data| log.debug("<{*}> prepare to start resizing, seat: {*}", .{ self, data.seat }),
+        .stop => log.debug("<{*}> prepare to stop resizing", .{ self }),
+    }
 
-    self.append_event(.{ .resize = seat });
+    self.append_event(.{ .resize = state });
 }
 
 
@@ -639,48 +661,54 @@ pub fn handle_events(self: *Self) void {
                 }
                 self.maximize = flag;
             },
-            .move => |data| {
-                log.debug("<{*}> managing move, seat: {*}", .{ self, data });
+            .move => |state| {
+                log.debug("<{*}> managing move, state: {s}", .{ self, @tagName(state) });
 
-                if (data) |seat| {
-                    seat.op_start();
-                    self.operator = .{
-                        .move = .{
-                            .start_x = self.x,
-                            .start_y = self.y,
-                            .seat = seat,
-                        },
-                    };
-                } else {
-                    switch (self.operator) {
-                        .move => |op_data| {
-                            op_data.seat.op_end();
-                        },
-                        else => unreachable,
+                switch (state) {
+                    .start => |data| {
+                        data.seat.op_start();
+                        self.operator = .{
+                            .move = .{
+                                .start_x = self.x,
+                                .start_y = self.y,
+                                .seat = data.seat,
+                            },
+                        };
+                    },
+                    .stop => {
+                        switch (self.operator) {
+                            .move => |op_data| {
+                                op_data.seat.op_end();
+                            },
+                            else => unreachable,
+                        }
+                        self.operator = .none;
                     }
-                    self.operator = .none;
                 }
             },
-            .resize => |data| {
-                log.debug("<{*}> managing resize, seat: {*}", .{ self, data });
+            .resize => |state| {
+                log.debug("<{*}> managing resize, state: {s}", .{ self, @tagName(state) });
 
-                if (data) |seat| {
-                    seat.op_start();
-                    self.operator = .{
-                        .resize = .{
-                            .start_width = self.width,
-                            .start_height = self.height,
-                            .seat = seat,
-                        },
-                    };
-                } else {
-                    switch (self.operator) {
-                        .resize => |op_data| {
-                            op_data.seat.op_end();
-                        },
-                        else => unreachable,
+                switch (state) {
+                    .start => |data| {
+                        data.seat.op_start();
+                        self.operator = .{
+                            .resize = .{
+                                .start_width = self.width,
+                                .start_height = self.height,
+                                .seat = data.seat,
+                            },
+                        };
+                    },
+                    .stop => {
+                        switch (self.operator) {
+                            .resize => |op_data| {
+                                op_data.seat.op_end();
+                            },
+                            else => unreachable,
+                        }
+                        self.operator = .none;
                     }
-                    self.operator = .none;
                 }
             },
         }
@@ -1104,7 +1132,7 @@ fn rwm_window_listener(rwm_window: *river.WindowV1, event: river.WindowV1.Event,
                 const seat: *Seat = @ptrCast(
                     @alignCast(river.SeatV1.getUserData(rwm_seat))
                 );
-                window.prepare_move(seat);
+                window.prepare_move(.{ .start = .{ .seat = seat } });
             }
 
         },
@@ -1117,7 +1145,7 @@ fn rwm_window_listener(rwm_window: *river.WindowV1, event: river.WindowV1.Event,
                 const seat: *Seat = @ptrCast(
                     @alignCast(river.SeatV1.getUserData(rwm_seat))
                 );
-                window.prepare_resize(seat);
+                window.prepare_resize(.{ .start = .{ .seat = seat } });
             }
         },
         .show_window_menu_requested => |data| {
