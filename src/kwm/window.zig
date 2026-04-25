@@ -38,9 +38,14 @@ const MoveState = union(enum) {
     start: Data,
     stop,
 };
+const ResizeDirection = struct {
+    horizontal: ?types.Direction,
+    vertical: ?types.Direction,
+};
 const ResizeState = union(enum) {
     const Data = struct {
         seat: *Seat,
+        direction: ResizeDirection,
     };
 
     start: Data,
@@ -124,8 +129,11 @@ operator: union(enum) {
         seat: *Seat,
     },
     resize: struct {
+        start_x: i32,
+        start_y: i32,
         start_width: i32,
         start_height: i32,
+        direction: ResizeDirection,
         seat: *Seat,
     },
 } = .none,
@@ -694,8 +702,11 @@ pub fn handle_events(self: *Self) void {
                         data.seat.op_start();
                         self.operator = .{
                             .resize = .{
+                                .start_x = self.x,
+                                .start_y = self.y,
                                 .start_width = self.width,
                                 .start_height = self.height,
+                                .direction = data.direction,
                                 .seat = data.seat,
                             },
                         };
@@ -1145,7 +1156,15 @@ fn rwm_window_listener(rwm_window: *river.WindowV1, event: river.WindowV1.Event,
                 const seat: *Seat = @ptrCast(
                     @alignCast(river.SeatV1.getUserData(rwm_seat))
                 );
-                window.prepare_resize(.{ .start = .{ .seat = seat } });
+                window.prepare_resize(.{
+                    .start = .{
+                        .seat = seat,
+                        .direction = .{
+                            .horizontal = if (data.edges.right) .forward else (if (data.edges.left) .reverse else null),
+                            .vertical = if (data.edges.bottom) .forward else (if (data.edges.top) .reverse else null),
+                        }
+                    }
+                });
             }
         },
         .show_window_menu_requested => |data| {
