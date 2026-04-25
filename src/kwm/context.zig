@@ -780,6 +780,30 @@ pub inline fn set_current_seat(self: *Self, seat: ?*Seat) void {
 }
 
 
+pub fn spawn_child(self: *Self, argv: []const []const u8) ?process.Child {
+    if (comptime builtins.mode == .Debug) {
+        const cmd = mem.join(utils.allocator, " ", argv) catch unreachable;
+        defer utils.allocator.free(cmd);
+        log.debug("spawn child process: {s}", .{ cmd });
+    }
+
+    const config = Config.get();
+
+    var child = process.Child.init(argv, utils.allocator);
+    child.env_map = &self.env;
+    child.cwd = switch (config.working_directory) {
+        .none => null,
+        .home => self.env.get("HOME"),
+        .custom => |dir| dir,
+    };
+    child.spawn() catch |err| {
+        log.err("spawn child process failed: {}", .{ err });
+        return null;
+    };
+    return child;
+}
+
+
 pub fn spawn(self: *Self, argv: []const []const u8) void {
     if (comptime builtins.mode == .Debug) {
         const cmd = mem.join(utils.allocator, " ", argv) catch unreachable;
@@ -880,27 +904,7 @@ fn run_startup_cmds(self: *Self) void {
         return;
     };
     for (config.startup_cmds) |argv| {
-        if (comptime builtins.mode == .Debug) {
-            const cmd = mem.join(utils.allocator, " ", argv) catch unreachable;
-            defer utils.allocator.free(cmd);
-            log.debug("running startup command: {s}", .{ cmd });
-        }
-
-        ctx.?.startup_processes.appendBounded(blk: {
-            var child = process.Child.init(argv, utils.allocator);
-            child.env_map = &self.env;
-            child.cwd = switch (config.working_directory) {
-                .none => null,
-                .home => self.env.get("HOME"),
-                .custom => |dir| dir,
-            };
-            child.spawn() catch |err| {
-                log.err("spawn child process failed: {}", .{ err });
-                break :blk null;
-            };
-            break :blk child;
-
-        }) catch unreachable;
+        ctx.?.startup_processes.appendBounded(self.spawn_child(argv)) catch unreachable;
     }
 }
 
