@@ -812,6 +812,29 @@ fn window_interaction(self: *Self, window: *Window) void {
 }
 
 
+fn shell_surface_interaction(self: *Self, shell_surface: *ShellSurface) void {
+    log.debug("<{*}> interaction with shell surface: {*}", .{ self, shell_surface });
+
+    const context = Context.get();
+
+    switch (shell_surface.type) {
+        .layer_marker => unreachable,
+        .bar => |bar| if (comptime build_options.bar_enabled) {
+            log.debug("<{*}> interaction with {*}", .{ self, bar });
+
+            context.set_current_output(bar.output);
+
+            bar.handle_click(self);
+        } else unreachable,
+        .background => |background| if (comptime build_options.background_enabled) {
+            log.debug("<{*}> interaction with {*}", .{ self, background });
+
+            context.set_current_output(background.output);
+        } else unreachable,
+    }
+}
+
+
 fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *Self) void {
     std.debug.assert(rwm_seat == seat.rwm_seat);
 
@@ -906,29 +929,8 @@ fn rwm_seat_listener(rwm_seat: *river.SeatV1, event: river.SeatV1.Event, seat: *
                 @alignCast((data.shell_surface orelse return).getUserData())
             );
 
-            log.debug("<{*}> interaction with {*}", .{ seat, shell_surface });
+            seat.shell_surface_interaction(shell_surface);
 
-            switch (shell_surface.type) {
-                .layer_marker => unreachable,
-                .bar => |bar| if (comptime build_options.bar_enabled) {
-                    log.debug("<{*}> interaction with {*}", .{ seat, bar });
-
-                    // avoid cursor warpping
-                    seat.previous_focused = .{ .output = bar.output };
-
-                    context.set_current_output(bar.output);
-
-                    bar.handle_click(seat);
-                } else unreachable,
-                .background => |background| if (comptime build_options.background_enabled) {
-                    log.debug("<{*}> interaction with {*}", .{ seat, background });
-
-                    // avoid cursor warpping
-                    seat.previous_focused = .{ .output = background.output };
-
-                    context.set_current_output(background.output);
-                } else unreachable,
-            }
         },
         .window_interaction => |data| {
             log.debug("<{*}> window interaction: {*}", .{ seat, data.window });
