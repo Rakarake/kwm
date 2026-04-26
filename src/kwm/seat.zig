@@ -11,6 +11,7 @@ const xkbcommon = @import("xkbcommon");
 const Keysym = xkbcommon.Keysym;
 const wayland = @import("wayland");
 const wl = wayland.client.wl;
+const wp = wayland.client.wp;
 const river = wayland.client.river;
 
 const Config = @import("config");
@@ -28,6 +29,7 @@ link: wl.list.Link = undefined,
 
 wl_seat: ?*wl.Seat = null,
 wl_pointer: ?*wl.Pointer = null,
+cursor_shape_device: ?*wp.CursorShapeDeviceV1 = null,
 rwm_seat: *river.SeatV1,
 rwm_layer_shell_seat: *river.LayerShellSeatV1,
 rwm_xkb_binding_seat: *river.XkbBindingsSeatV1,
@@ -108,6 +110,7 @@ pub fn destroy(self: *Self) void {
     self.link.remove();
     if (self.wl_seat) |wl_seat| wl_seat.destroy();
     if (self.wl_pointer) |wl_pointer| wl_pointer.destroy();
+    if (self.cursor_shape_device) |cursor_shape_device| cursor_shape_device.destroy();
     self.rwm_seat.destroy();
     self.rwm_layer_shell_seat.destroy();
 
@@ -146,15 +149,47 @@ pub fn toggle_bindings(self: *Self, mode: []const u8, flag: bool) void {
 }
 
 
-pub inline fn op_start(self: *Self) void {
+pub fn op_start(self: *Self, @"type": union(enum) { move, resize: Window.ResizeDirection }) void {
     log.debug("<{*}> op begin", .{ self });
+
+    if (self.cursor_shape_device) |cursor_shape_device| {
+        cursor_shape_device.setShape(0, switch (@"type") {
+            .move => .move,
+            .resize => |direction|
+                if (direction.horizontal == null)
+                    switch (direction.vertical.?) {
+                        .forward => .s_resize,
+                        .reverse => .n_resize,
+                    }
+                 else if (direction.vertical == null)
+                    switch (direction.horizontal.?) {
+                        .forward => .e_resize,
+                        .reverse => .w_resize,
+                    }
+                 else
+                     switch (direction.vertical.?) {
+                         .forward => switch (direction.horizontal.?) {
+                             .forward => .se_resize,
+                             .reverse => .sw_resize,
+                         },
+                         .reverse => switch (direction.horizontal.?) {
+                             .forward => .ne_resize,
+                             .reverse => .nw_resize,
+                         },
+                     }
+        });
+    }
 
     self.rwm_seat.opStartPointer();
 }
 
 
-pub inline fn op_end(self: *Self) void {
+pub fn op_end(self: *Self) void {
     log.debug("<{*}> op end", .{ self });
+
+    if (self.cursor_shape_device) |cursor_shape_device| {
+        cursor_shape_device.setShape(0, .default);
+    }
 
     self.rwm_seat.opEnd();
 }
@@ -1054,8 +1089,9 @@ fn wl_seat_listener(wl_seat: *wl.Seat, event: wl.Seat.Event, seat: *Self) void {
             }
             if (data.capabilities.pointer) {
                 const wl_pointer = wl_seat.getPointer() catch return;
-                seat.wl_pointer = wl_pointer;
                 wl_pointer.setListener(*Self, wl_pointer_listener, seat);
+                seat.wl_pointer = wl_pointer;
+                seat.cursor_shape_device = context.wp_cursor_shape_manager.getPointer(wl_pointer) catch null;
             }
 
             // automatically run `kwim` when receive `capabilities` event
@@ -1083,6 +1119,13 @@ fn wl_pointer_listener(wl_pointer: *wl.Pointer, event: wl.Pointer.Event, seat: *
             log.debug("<{*}> button: {}, state: {s}", .{ seat, data.button, @tagName(data.state) });
 
             seat.button = @enumFromInt(data.button);
+        },
+        .enter => |data| {
+            log.debug("<{*}> enter: (surface: {*}, x: {}, y: {})", .{ seat, data.surface, data.surface_x.toInt(), data.surface_y.toInt() });
+
+            if (seat.cursor_shape_device) |cursor_shape_device| {
+                cursor_shape_device.setShape(0, .default);
+            }
         },
         else => {}
     }
